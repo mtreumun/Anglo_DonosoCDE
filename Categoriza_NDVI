@@ -106,16 +106,16 @@ print(decile_data)
 #Experimento con percentiles
 
 # Calcular los cuantiles
-percentiles_2023 <- quantile(donoso_2023_sf$Mean_ndvi_, probs = c(0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9), na.rm = TRUE)
-percentiles_2024 <- quantile(donoso_2024_sf$Mean_ndvi_, probs = c(0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9), na.rm = TRUE)
+percentiles_2023 <- quantile(donoso_2023_sf$Mean_ndvi_, probs = c(0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9,1), na.rm = TRUE)
+percentiles_2024 <- quantile(donoso_2024_sf$Mean_ndvi_, probs = c(0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9,1), na.rm = TRUE)
 
 # Añadir -Inf y Inf para cubrir todos los posibles valores de NDVI
 breaks_2023 <- c(-Inf, percentiles_2023, Inf)
 breaks_2024 <- c(-Inf, percentiles_2024, Inf)
 
 # Asignar categorías según los cuantiles
-labels_2023 <- cut(donoso_2023_sf$Mean_ndvi_, breaks = breaks_2023, labels = c("A", "B", "C", "D", "E", "F", "G", "H", "I", "J"))
-labels_2024 <- cut(donoso_2024_sf$Mean_ndvi_, breaks = breaks_2024, labels = c("A", "B", "C", "D", "E", "F", "G", "H", "I", "J"))
+labels_2023 <- cut(donoso_2023_sf$Mean_ndvi_, breaks = breaks_2023, labels = c(1,2,3,4,5,6,7,8,9,10,11))
+labels_2024 <- cut(donoso_2024_sf$Mean_ndvi_, breaks = breaks_2024, labels = c(1,2,3,4,5,6,7,8,9,10,11))
 
 # Agregar las nuevas categorías a los dataframes
 donoso_2023_sf$NDVI_Category <- labels_2023
@@ -125,15 +125,24 @@ donoso_2024_sf$NDVI_Category <- labels_2024
 head(donoso_2023_sf[c("Mean_ndvi_", "NDVI_Category")])
 head(donoso_2024_sf[c("Mean_ndvi_", "NDVI_Category")])
 
+# Filtrar para ID_Poly_po = 9 para ambos años
+filtered_2023_sf <- donoso_2023_sf %>% 
+  filter(ID_Poly_po == 9) %>%
+  st_drop_geometry()  # Eliminar geometría para operaciones no espaciales
+
+filtered_2024_sf <- donoso_2024_sf %>% 
+  filter(ID_Poly_po == 9) %>%
+  st_drop_geometry()  # Eliminar geometría para operaciones no espaciales
+
 # Calcular las frecuencias para 2023
-frequencies_2023 <- donoso_2023_sf %>%
+frequencies_2023 <- filtered_2023_sf %>%
   group_by(NDVI_Category) %>%
-  summarise(Frequency_2023 = n())
+  summarise(Frequency_2023 = n(), .groups = 'drop')
 
 # Calcular las frecuencias para 2024
-frequencies_2024 <- donoso_2024_sf %>%
+frequencies_2024 <- filtered_2024_sf %>%
   group_by(NDVI_Category) %>%
-  summarise(Frequency_2024 = n())
+  summarise(Frequency_2024 = n(), .groups = 'drop')
 
 # Combinar las tablas de frecuencias de 2023 y 2024
 combined_frequencies <- full_join(frequencies_2023, frequencies_2024, by = "NDVI_Category")
@@ -144,3 +153,17 @@ final_table <- combined_frequencies %>%
 
 # Imprimir la tabla final
 print(final_table)
+
+# Filtrar para ID_Poly_po = 10
+subset_2023_sf <- donoso_2024_sf[donoso_2023_sf$ID_Poly_po == 9, ]
+
+# Asegurarse de que los datos estén en el rango -1 a 1 (si necesario)
+subset_2023_sf <- subset_2023_sf[subset_2023_sf$Mean_ndvi_ >= -1 & subset_2023_sf$Mean_ndvi_ <= 1, ]
+
+
+
+# Calcular los percentiles para el NDVI
+percentiles_2023_id9 <- quantile(subset_2023_sf$Mean_ndvi_, probs = c(0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1), na.rm = TRUE)
+
+# Imprimir los resultados
+print(percentiles_2023_id9)
