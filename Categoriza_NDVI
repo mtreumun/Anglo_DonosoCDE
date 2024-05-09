@@ -1,0 +1,146 @@
+library(sf)
+library(ggplot2)
+library(dplyr)
+library(transport)
+
+
+# Procesamiento del archivo 2023
+donoso_2023 <- "E:/ANGLO_Ortiga CDE/CAPAS/20240507_2023.shp"
+donoso_2023_sf <- st_read(donoso_2023)
+
+unique_ids_2023 <- unique(donoso_2023_sf$ID_Poly_po)
+
+for (id in unique_ids_2023) {
+  subset_data <- donoso_2023_sf[donoso_2023_sf$ID_Poly_po == id, ]
+  subset_data <- subset_data[subset_data$Mean_ndvi_ >= -1 & subset_data$Mean_ndvi_ <= 1, ]
+  
+  if (nrow(subset_data) > 0) {
+    p <- ggplot(subset_data, aes(x = Mean_ndvi_)) +
+      geom_histogram(bins = 10, fill = "blue", color = "black") +
+      ggtitle(paste("Histogram of Mean_ndvi_ for ID_Poly_po:", id)) +
+      xlab("Mean_ndvi_") +
+      ylab("Frequency") +
+      xlim(-1, 1)
+    print(p)
+  } else {
+    print(paste("No valid data available for ID_Poly_po:", id))
+  }
+}
+
+# Procesamiento del archivo 2024
+donoso_2024 <- "E:/ANGLO_Ortiga CDE/CAPAS/20240507_2024.shp"
+donoso_2024_sf <- st_read(donoso_2024)
+
+unique_ids_2024 <- unique(donoso_2024_sf$ID_Poly_po)
+
+for (id in unique_ids_2024) {
+  subset_data <- donoso_2024_sf[donoso_2024_sf$ID_Poly_po == id, ]
+  subset_data <- subset_data[subset_data$Mean_ndvi_ >= -1 & subset_data$Mean_ndvi_ <= 1, ]
+  
+  if (nrow(subset_data) > 0) {
+    p <- ggplot(subset_data, aes(x = Mean_ndvi_)) +
+      geom_histogram(bins = 10, fill = "blue", color = "black") +
+      ggtitle(paste("Histogram of Mean_ndvi_ for ID_Poly_po:", id, " (2024)")) +
+      xlab("Mean_ndvi_") +
+      ylab("Frequency") +
+      xlim(-1, 1)
+    print(p)
+  } else {
+    print(paste("No valid data available for ID_Poly_po:", id))
+  }
+}
+
+
+######################################################################
+#APLICACION DE WEISSERSTEIN DISTANCE
+
+# Filtrar para ID_Poly_po = 10
+subset_data_2023 <- donoso_2023_sf[donoso_2023_sf$ID_Poly_po == 9, ]
+subset_data_2024 <- donoso_2024_sf[donoso_2024_sf$ID_Poly_po == 9, ]
+
+# Asegurarse que los datos estén en el rango -1 a 1
+subset_data_2023 <- subset_data_2023[subset_data_2023$Mean_ndvi_ >= -1 & subset_data_2023$Mean_ndvi_ <= 1, ]
+subset_data_2024 <- subset_data_2024[subset_data_2024$Mean_ndvi_ >= -1 & subset_data_2024$Mean_ndvi_ <= 1, ]
+
+# Histogramas con un número fijo de bins y un rango específico
+breaks <- seq(-1, 1, length.out = 11)  # Asegura 10 bins iguales
+hist_2023 <- hist(subset_data_2023$Mean_ndvi_, plot = FALSE, breaks = breaks, right = FALSE)
+hist_2024 <- hist(subset_data_2024$Mean_ndvi_, plot = FALSE, breaks = breaks, right = FALSE)
+
+# Normalizar los histogramas
+total_mass_2023 <- sum(hist_2023$counts)
+total_mass_2024 <- sum(hist_2024$counts)
+normalized_hist_2023 <- hist_2023$counts / total_mass_2023
+normalized_hist_2024 <- hist_2024$counts / total_mass_2024
+
+# Crear una matriz de costos asumiendo que los histogramas están igualmente espaciados
+bin_count <- length(hist_2023$breaks) - 1
+cost_matrix <- matrix(0, nrow = bin_count, ncol = bin_count)
+for (i in 1:bin_count) {
+  for (j in 1:bin_count) {
+    cost_matrix[i, j] <- abs(i - j)  # Simple cost: distance between indices
+  }
+}
+
+# Calcular la distancia de Wasserstein
+if (length(normalized_hist_2023) > 0 && length(normalized_hist_2024) > 0 && total_mass_2023 > 0 && total_mass_2024 > 0) {
+  wasserstein_distance <- wasserstein(normalized_hist_2023, normalized_hist_2024, costm = cost_matrix)
+  print(paste("Wasserstein distance for ID_Poly_po 10:", wasserstein_distance))
+} else {
+  print("Insufficient data for Wasserstein distance calculation for ID_Poly_po 10")
+}
+
+# Crear dataframes de las frecuencias de los bins para cada año
+decile_labels <- sapply(1:10, function(i) paste(round(hist_2023$breaks[i], 2), "-", round(hist_2023$breaks[i+1], 2)))
+decile_data <- data.frame(
+  Decile = decile_labels,
+  Frequency_2023 = hist_2023$counts,
+  Frequency_2024 = hist_2024$counts
+)
+
+# Imprimir el dataframe
+print(decile_data)
+
+
+#############################################################################
+#Experimento con percentiles
+
+# Calcular los cuantiles
+percentiles_2023 <- quantile(donoso_2023_sf$Mean_ndvi_, probs = c(0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9), na.rm = TRUE)
+percentiles_2024 <- quantile(donoso_2024_sf$Mean_ndvi_, probs = c(0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9), na.rm = TRUE)
+
+# Añadir -Inf y Inf para cubrir todos los posibles valores de NDVI
+breaks_2023 <- c(-Inf, percentiles_2023, Inf)
+breaks_2024 <- c(-Inf, percentiles_2024, Inf)
+
+# Asignar categorías según los cuantiles
+labels_2023 <- cut(donoso_2023_sf$Mean_ndvi_, breaks = breaks_2023, labels = c("A", "B", "C", "D", "E", "F", "G", "H", "I", "J"))
+labels_2024 <- cut(donoso_2024_sf$Mean_ndvi_, breaks = breaks_2024, labels = c("A", "B", "C", "D", "E", "F", "G", "H", "I", "J"))
+
+# Agregar las nuevas categorías a los dataframes
+donoso_2023_sf$NDVI_Category <- labels_2023
+donoso_2024_sf$NDVI_Category <- labels_2024
+
+# Opcional: Mostrar una tabla con las primeras filas de los datos categorizados
+head(donoso_2023_sf[c("Mean_ndvi_", "NDVI_Category")])
+head(donoso_2024_sf[c("Mean_ndvi_", "NDVI_Category")])
+
+# Calcular las frecuencias para 2023
+frequencies_2023 <- donoso_2023_sf %>%
+  group_by(NDVI_Category) %>%
+  summarise(Frequency_2023 = n())
+
+# Calcular las frecuencias para 2024
+frequencies_2024 <- donoso_2024_sf %>%
+  group_by(NDVI_Category) %>%
+  summarise(Frequency_2024 = n())
+
+# Combinar las tablas de frecuencias de 2023 y 2024
+combined_frequencies <- full_join(frequencies_2023, frequencies_2024, by = "NDVI_Category")
+
+# Ordenar la tabla por NDVI_Category para mejorar la legibilidad
+final_table <- combined_frequencies %>%
+  arrange(NDVI_Category)
+
+# Imprimir la tabla final
+print(final_table)
