@@ -49,6 +49,7 @@ for (id in unique_ids_2024) {
     print(paste("No valid data available for ID_Poly_po:", id))
   }
 }
+
 #############################################################################
 #CALCULO DE CUANTILES PARA CADA ID_poly_Po
 # Calcular los cuantiles
@@ -110,17 +111,84 @@ for (id in unique_ids) {
 }
 
 # Ordenar el resultado final por `ID_Poly_po` y `NDVI_Category`
-final_table <- all_combined_frequencies %>%
+final_table <- all_combined_frequencies #%>%
   arrange(ID_Poly_po, NDVI_Category)
 
 # Imprimir el resultado final
 print(final_table)
 
 # Especificar la ruta y el nombre del archivo
-output_path <- "E:/ANGLO_Ortiga CDE/BD/ID_Poly_frequenciesNDVI_MT_20240509_v1.csv"
+output_path <- "E:/ANGLO_Ortiga CDE/BD/ID_Poly_frequenciesNDVI_MT_20240513_v1.csv"
 
 # Exportar final_table a un archivo CSV
 write.csv(final_table, output_path, row.names = FALSE)
+
+#############################################################################
+#GRAFICO EXPERIMENTAL
+# Combine the datasets with pre-defined NDVI categories
+donoso_2023_sf$Year <- "2023"
+donoso_2024_sf$Year <- "2024"
+combined_data <- rbind(donoso_2023_sf, donoso_2024_sf)
+
+# Filter for specific ID_Poly_po and valid data
+filtered_data <- combined_data %>%
+  filter(ID_Poly_po == 9, !is.na(NDVI_Category))
+
+# Prepare the plot data by summarizing the count of each category
+plot_data <- filtered_data %>%
+  group_by(NDVI_Category, Year) %>%
+  summarise(Count = n(), .groups = 'drop')
+
+# Create the plot
+p <- ggplot(plot_data, aes(x = NDVI_Category, y = Count, fill = Year)) +
+  geom_bar(stat = "identity", position = position_dodge(0.8), color = "black") +
+  labs(title = "Categorías de NDVI para la unidad n° 9",
+       x = "Categoría de NDVI",
+       y = "Frecuencia de píxeles") +
+  theme_minimal()
+
+print(p)
+
+
+###########################################################################
+#GRAFICO EXPERIMENTAL
+
+# Combine the datasets with pre-defined NDVI categories
+donoso_2023_sf$Year <- "2023"
+donoso_2024_sf$Year <- "2024"
+combined_data <- rbind(donoso_2023_sf, donoso_2024_sf)
+
+# Create a list to store plots
+plot_list <- list()
+
+# Loop over each ID_Poly_po from 1 to 13
+for (id in 1:13) {
+  # Filter for specific ID_Poly_po and valid data
+  filtered_data <- combined_data %>%
+    filter(ID_Poly_po == id, !is.na(NDVI_Category))
+  
+  # Prepare the plot data by summarizing the count of each category
+  plot_data <- filtered_data %>%
+    group_by(NDVI_Category, Year) %>%
+    summarise(Count = n(), .groups = 'drop')
+  
+  # Create the plot
+  p <- ggplot(plot_data, aes(x = NDVI_Category, y = Count, fill = Year)) +
+    geom_bar(stat = "identity", position = position_dodge(0.8), color = "black") +
+    labs(title = paste("Categorías de NDVI para la unidad n°", id),
+         x = "Categoría de NDVI",
+         y = "Frecuencia de píxeles") +
+    theme_minimal()
+  
+  # Store the plot in the list
+  plot_list[[id]] <- p
+}
+
+# Optionally, print plots individually or use them as needed
+for (plot in plot_list) {
+  print(plot)
+}
+
 
 ######################################################################
 #APLICACION DE WEISSERSTEIN DISTANCE PARA CADA POLY
@@ -218,13 +286,11 @@ final_table <- combined_frequencies %>%
 # Imprimir la tabla final
 print(final_table)
 
-# Filtrar para ID_Poly_po = 10
+# Filtrar para ID_Poly_po = 9
 subset_2023_sf <- donoso_2024_sf[donoso_2023_sf$ID_Poly_po == 9, ]
 
 # Asegurarse de que los datos estén en el rango -1 a 1 (si necesario)
 subset_2023_sf <- subset_2023_sf[subset_2023_sf$Mean_ndvi_ >= -1 & subset_2023_sf$Mean_ndvi_ <= 1, ]
-
-
 
 # Calcular los percentiles para el NDVI
 percentiles_2023_id9 <- quantile(subset_2023_sf$Mean_ndvi_, probs = c(0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1), na.rm = TRUE)
