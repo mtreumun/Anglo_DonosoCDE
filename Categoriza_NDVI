@@ -142,9 +142,14 @@ plot_data <- filtered_data %>%
 # Create the plot
 p <- ggplot(plot_data, aes(x = NDVI_Category, y = Count, fill = Year)) +
   geom_bar(stat = "identity", position = position_dodge(0.8), color = "black") +
+  geom_vline(xintercept = 5.5, linetype = "dashed", color = "red", size = 1) +
+  annotate("text", x = 5.5, y = max(plot_data$Count), label = "Límite estimado de la actividad fotosintética", 
+           angle = 90, vjust = -0.5, hjust = 1, color = "red") +
+  scale_y_continuous(labels = function(x) format(x, big.mark = ".", decimal.mark = ",")) +
   labs(title = "Categorías de NDVI para la unidad n° 9",
        x = "Categoría de NDVI",
-       y = "Frecuencia de píxeles") +
+       y = "Recuento de píxeles",
+      fill="Año")+
   theme_minimal()
 
 print(p)
@@ -175,9 +180,14 @@ for (id in 1:13) {
   # Create the plot
   p <- ggplot(plot_data, aes(x = NDVI_Category, y = Count, fill = Year)) +
     geom_bar(stat = "identity", position = position_dodge(0.8), color = "black") +
-    labs(title = paste("Categorías de NDVI para la unidad n°", id),
+    geom_vline(xintercept = 5.5, linetype = "dashed", color = "red", size = 1) +
+    annotate("text", x = 5.5, y = max(plot_data$Count), label = "Límite estimado de la actividad fotosintética", 
+             angle = 90, vjust = -0.5, hjust = 1, color = "red") +
+    scale_y_continuous(labels = function(x) format(x, big.mark = ".", decimal.mark = ",")) +
+    labs(title = paste("Categorías de NDVI para la Unidad n°", id),
          x = "Categoría de NDVI",
-         y = "Frecuencia de píxeles") +
+         y = "Recuento de píxeles",
+         fill="Año") +
     theme_minimal()
   
   # Store the plot in the list
@@ -348,3 +358,88 @@ decile_data <- data.frame(
 
 # Imprimir el dataframe
 print(decile_data)
+
+#########################################################################################################
+#TRABAJO CON AGRUPACIONES PROPUESTAS ME
+
+# Definir los grupos
+groups <- list(
+  group1 = c(5, 7),
+  group2 = c(6, 8, 9, 10, 11, 12, 13),
+  group3 = c(1, 2, 3, 4)
+)
+
+# Calcular los cuantiles para cada grupo
+calculate_percentiles <- function(data, group) {
+  filtered_data <- subset(data, ID_Poly_po %in% group)
+  quantile(filtered_data$Mean_ndvi_, probs = c(0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1), na.rm = TRUE)
+}
+
+percentiles_2023 <- lapply(groups, calculate_percentiles, data = donoso_2023_sf)
+percentiles_2024 <- lapply(groups, calculate_percentiles, data = donoso_2024_sf)
+
+# Crear categorías de NDVI basadas en los cuantiles
+create_labels <- function(data, percentiles) {
+  breaks <- c(-Inf, percentiles, Inf)
+  cut(data$Mean_ndvi_, breaks = breaks, labels = c(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11))
+}
+
+# Aplicar la función para cada grupo y año
+apply_labels <- function(data, groups, percentiles) {
+  labeled_data <- data
+  for (group_name in names(groups)) {
+    group <- groups[[group_name]]
+    group_percentiles <- percentiles[[group_name]]
+    group_data <- subset(labeled_data, ID_Poly_po %in% group)
+    labeled_data$NDVI_Category[labeled_data$ID_Poly_po %in% group] <- create_labels(group_data, group_percentiles)
+  }
+  labeled_data
+}
+
+donoso_2023_sf <- apply_labels(donoso_2023_sf, groups, percentiles_2023)
+donoso_2024_sf <- apply_labels(donoso_2024_sf, groups, percentiles_2024)
+
+# Combinar los datos de 2023 y 2024
+donoso_2023_sf$Year <- "2023"
+donoso_2024_sf$Year <- "2024"
+combined_data <- rbind(donoso_2023_sf, donoso_2024_sf)
+
+# Calcular las frecuencias de las categorías por grupo y año
+calculate_frequencies <- function(data, group_name) {
+  data %>%
+    group_by(NDVI_Category, Year) %>%
+    summarise(Count = n(), .groups = 'drop') %>%
+    mutate(Group = group_name)
+}
+
+# Aplicar la función de cálculo de frecuencias a los datos combinados
+frequencies <- do.call(rbind, lapply(names(groups), function(group_name) {
+  group_data <- subset(combined_data, ID_Poly_po %in% groups[[group_name]])
+  calculate_frequencies(group_data, group_name)
+}))
+
+# Graficar los resultados
+plot_frequencies <- function(data, group_name) {
+  ggplot(data, aes(x = NDVI_Category, y = Count, fill = Year)) +
+    geom_bar(stat = "identity", position = position_dodge(0.8), color = "black") +
+    geom_vline(xintercept = 5.5, linetype = "dashed", color = "red", size = 1) +
+    annotate("text", x = 5.5, y = max(data$Count), label = "Límite estimado de la actividad fotosintética", 
+             angle = 90, vjust = -0.5, hjust = 1, color = "red") +
+    scale_y_continuous(labels = function(x) format(x, big.mark = ".", decimal.mark = ",")) +
+    labs(title = paste("Categorías de NDVI para el grupo", group_name),
+         x = "Categoría de NDVI",
+         y = "Recuento de píxeles",
+         fill = "Año") +
+    theme_minimal()
+}
+
+# Crear y mostrar los gráficos para cada grupo
+plots <- lapply(names(groups), function(group_name) {
+  group_data <- subset(frequencies, Group == group_name)
+  plot_frequencies(group_data, group_name)
+})
+
+# Mostrar los gráficos
+for (p in plots) {
+  print(p)
+}
