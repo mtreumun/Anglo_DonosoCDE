@@ -7,12 +7,12 @@ library(dplyr)
 library(transport)
 
 # Lee NDVI Donoso 2023
-donoso_2023 <- "E:/ANGLO_Ortiga CDE/CAPAS/20240507_2023.shp"
+donoso_2023 <- "D:/ANGLO_Ortiga CDE/CAPAS/20240507_2023.shp"
 donoso_2023_sf <- st_read(donoso_2023)
 unique_ids_2023 <- unique(donoso_2023_sf$ID_Poly_po)
 
 # Lee NDVI Donoso 2024
-donoso_2024 <- "E:/ANGLO_Ortiga CDE/CAPAS/20240507_2024.shp"
+donoso_2024 <- "D:/ANGLO_Ortiga CDE/CAPAS/20240507_2024.shp"
 donoso_2024_sf <- st_read(donoso_2024)
 unique_ids_2024 <- unique(donoso_2024_sf$ID_Poly_po)
 
@@ -114,13 +114,13 @@ for (id in unique_ids) {
 
 # Ordenar el resultado final por `ID_Poly_po` y `NDVI_Category`
 final_table <- all_combined_frequencies #%>%
-  arrange(ID_Poly_po, NDVI_Category)
+#arrange(ID_Poly_po, NDVI_Category)
 
 # Imprimir el resultado final
 print(final_table)
 
 # Especificar la ruta y el nombre del archivo
-output_path <- "E:/ANGLO_Ortiga CDE/BD/ID_Poly_frequenciesNDVI_MT_20240513_v1.csv"
+output_path <- "D:/ANGLO_Ortiga CDE/BD/ID_Poly_frequenciesNDVI_MT_20240513_v1.csv"
 
 # Exportar final_table a un archivo CSV
 write.csv(final_table, output_path, row.names = FALSE)
@@ -241,175 +241,6 @@ for (group in c("group1", "group2", "group3")) {
 final_table <- all_combined_frequencies %>%
   arrange(Group, NDVI_Category)
 
-# Imprimir el resultado final
-print(final_table)
-
-# Especificar la ruta y el nombre del archivo
-output_path <- "E:/ANGLO_Ortiga CDE/BD/Group_frequenciesNDVI_MT_20240513_v1.csv"
-
-# Exportar final_table a un archivo CSV
-write.csv(final_table, output_path, row.names = FALSE)
-
-##############################################################################################################
-#GRAFICOS DE AGRUPACIONES PROPUESTAS ME SUBTIPOS DE VEGETACION
-
-#Subtipo Carex macloviana
-
-# Añadir la columna 'Year' a cada dataframe
-donoso_2023_sf$Year <- "2023"
-donoso_2024_sf$Year <- "2024"
-
-# Filtrar por grupo antes de combinar
-donoso_2023_sf_group1 <- donoso_2023_sf %>% filter(Group == "group1")
-donoso_2024_sf_group1 <- donoso_2024_sf %>% filter(Group == "group1")
-
-# Combinar los dataframes filtrados
-combined_data <- rbind(donoso_2023_sf_group1, donoso_2024_sf_group1)
-
-# Filtrar datos para el grupo 1 y asegurar que las categorías de NDVI son válidas
-filtered_data <- combined_data %>%
-  filter(Group == "group1", !is.na(NDVI_Category))
-
-# Preparar los datos para el gráfico sumarizando el conteo de cada categoría
-plot_data <- filtered_data %>%
-  group_by(NDVI_Category, Year) %>%
-  summarise(Count = n(), .groups = 'drop')
-
-# Crear el gráfico
-p <- ggplot(plot_data, aes(x = NDVI_Category, y = Count, fill = Year)) +
-  geom_bar(stat = "identity", position = position_dodge(0.8), color = "black") +
-  geom_vline(xintercept = 5.5, linetype = "dashed", color = "red", size = 1) +
-  annotate("text", x = 5.5, y = max(plot_data$Count, na.rm = TRUE), label = "Límite estimado de la actividad fotosintética", 
-           angle = 90, vjust = -0.5, hjust = 1, color = "red") +
-  scale_y_continuous(labels = function(x) format(x, big.mark = ".", decimal.mark = ",")) +
-  labs(title = "Subtipo Vega de Carex macloviana",
-       x = "Categoría de NDVI",
-       y = "Recuento de píxeles",
-       fill="Año") +
-  theme_minimal()
-
-# Mostrar el gráfico
-print(p)
-
-#Subtipo Vega de Patosia clandestina y Carex macloviana
-
-# Añadir la columna 'Year' a cada dataframe
-donoso_2023_sf$Year <- "2023"
-donoso_2024_sf$Year <- "2024"
-
-# Filtrar por grupo antes de combinar
-donoso_2023_sf_group2 <- donoso_2023_sf %>% filter(Group == "group2")
-donoso_2024_sf_group2 <- donoso_2024_sf %>% filter(Group == "group2")
-
-# Combinar los dataframes filtrados
-combined_data <- rbind(donoso_2023_sf_group2, donoso_2024_sf_group2)
-
-# Filtrar datos para el grupo 1 y asegurar que las categorías de NDVI son válidas
-filtered_data <- combined_data %>%
-  filter(Group == "group2", !is.na(NDVI_Category))
-
-# Preparar los datos para el gráfico sumarizando el conteo de cada categoría
-plot_data <- filtered_data %>%
-  group_by(NDVI_Category, Year) %>%
-  summarise(Count = n(), .groups = 'drop')
-
-# Crear el gráfico
-p <- ggplot(plot_data, aes(x = NDVI_Category, y = Count, fill = Year)) +
-  geom_bar(stat = "identity", position = position_dodge(0.8), color = "black") +
-  geom_vline(xintercept = 5.5, linetype = "dashed", color = "red", size = 1) +
-  annotate("text", x = 5.5, y = max(plot_data$Count, na.rm = TRUE), label = "Límite estimado de la actividad fotosintética", 
-           angle = 90, vjust = -0.5, hjust = 1, color = "red") +
-  scale_y_continuous(labels = function(x) format(x, big.mark = ".", decimal.mark = ",")) +
-  labs(title = "Subtipo Vega de Patosia clandestina y Carex macloviana",
-       x = "Categoría de NDVI",
-       y = "Recuento de píxeles",
-       fill="Año") +
-  theme_minimal()
-
-# Mostrar el gráfico
-print(p)
-
-#Subtipo Vega de Patosia clandestina y Zameioscirpus gaimardioides
-
-# Añadir la columna 'Year' a cada dataframe
-donoso_2023_sf$Year <- "2023"
-donoso_2024_sf$Year <- "2024"
-
-# Filtrar por grupo antes de combinar
-donoso_2023_sf_group3 <- donoso_2023_sf %>% filter(Group == "group3")
-donoso_2024_sf_group3 <- donoso_2024_sf %>% filter(Group == "group3")
-
-# Combinar los dataframes filtrados
-combined_data <- rbind(donoso_2023_sf_group3, donoso_2024_sf_group3)
-
-# Filtrar datos para el grupo 1 y asegurar que las categorías de NDVI son válidas
-filtered_data <- combined_data %>%
-  filter(Group == "group3", !is.na(NDVI_Category))
-
-# Preparar los datos para el gráfico sumarizando el conteo de cada categoría
-plot_data <- filtered_data %>%
-  group_by(NDVI_Category, Year) %>%
-  summarise(Count = n(), .groups = 'drop')
-
-# Crear el gráfico
-p <- ggplot(plot_data, aes(x = NDVI_Category, y = Count, fill = Year)) +
-  geom_bar(stat = "identity", position = position_dodge(0.8), color = "black") +
-  geom_vline(xintercept = 5.5, linetype = "dashed", color = "red", size = 1) +
-  annotate("text", x = 5.5, y = max(plot_data$Count, na.rm = TRUE), label = "Límite estimado de la actividad fotosintética", 
-           angle = 90, vjust = -0.5, hjust = 1, color = "red") +
-  scale_y_continuous(labels = function(x) format(x, big.mark = ".", decimal.mark = ",")) +
-  labs(title = "Vega de Patosia clandestina y Zameioscirpus gaimardioides",
-       x = "Categoría de NDVI",
-       y = "Recuento de píxeles",
-       fill="Año") +
-  theme_minimal()
-
-# Mostrar el gráfico
-print(p)
-
-######################################################################
-#APLICACION DE WEISSERSTEIN DISTANCE PARA LOS 13 POLYS
-# Obtener los ID únicos de los polígonos
-unique_ids <- unique(c(donoso_2023_sf$ID_Poly_po, donoso_2024_sf$ID_Poly_po))
-
-# Iterar sobre cada ID_Poly_po
-for (id in unique_ids) {
-  # Filtrar los datos por ID_Poly_po
-  subset_data_2023 <- donoso_2023_sf[donoso_2023_sf$ID_Poly_po == id, ]
-  subset_data_2024 <- donoso_2024_sf[donoso_2024_sf$ID_Poly_po == id, ]
-  
-  # Asegurarse que los datos estén en el rango -1 a 1
-  subset_data_2023 <- subset_data_2023[subset_data_2023$Mean_ndvi_ >= -1 & subset_data_2023$Mean_ndvi_ <= 1, ]
-  subset_data_2024 <- subset_data_2024[subset_data_2024$Mean_ndvi_ >= -1 & subset_data_2024$Mean_ndvi_ <= 1, ]
-  
-  # Histogramas con un número fijo de bins y un rango específico
-  breaks <- seq(-1, 1, length.out = 11)  # Asegura 10 bins iguales
-  hist_2023 <- hist(subset_data_2023$Mean_ndvi_, plot = FALSE, breaks = breaks, right = FALSE)
-  hist_2024 <- hist(subset_data_2024$Mean_ndvi_, plot = FALSE, breaks = breaks, right = FALSE)
-  
-  # Normalizar los histogramas
-  total_mass_2023 <- sum(hist_2023$counts)
-  total_mass_2024 <- sum(hist_2024$counts)
-  normalized_hist_2023 <- hist_2023$counts / total_mass_2023
-  normalized_hist_2024 <- hist_2024$counts / total_mass_2024
-  
-  # Crear una matriz de costos asumiendo que los histogramas están igualmente espaciados
-  bin_count <- length(hist_2023$breaks) - 1
-  cost_matrix <- matrix(0, nrow = bin_count, ncol = bin_count)
-  for (i in 1:bin_count) {
-    for (j in 1:bin_count) {
-      cost_matrix[i, j] <- abs(i - j)  # Simple cost: distance between indices
-    }
-  }
-  
-  # Calcular la distancia de Wasserstein
-  if (length(normalized_hist_2023) > 0 && length(normalized_hist_2024) > 0 && total_mass_2023 > 0 && total_mass_2024 > 0) {
-    wasserstein_distance <- wasserstein(normalized_hist_2023, normalized_hist_2024, costm = cost_matrix)
-    print(paste("Wasserstein distance for ID_Poly_po", id, ":", wasserstein_distance))
-  } else {
-    print(paste("Insufficient data for Wasserstein distance calculation for ID_Poly_po", id))
-  }
-}
 
 
 #############################################################################################################################
