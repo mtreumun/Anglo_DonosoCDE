@@ -1,8 +1,10 @@
+###################################################################################################
+#CODIGO DESARROLLADO POR MATÍAS TREUMUN - MAYO 2024
+
 library(sf)
 library(ggplot2)
 library(dplyr)
 library(transport)
-
 
 # Lee NDVI Donoso 2023
 donoso_2023 <- "E:/ANGLO_Ortiga CDE/CAPAS/20240507_2023.shp"
@@ -123,40 +125,8 @@ output_path <- "E:/ANGLO_Ortiga CDE/BD/ID_Poly_frequenciesNDVI_MT_20240513_v1.cs
 # Exportar final_table a un archivo CSV
 write.csv(final_table, output_path, row.names = FALSE)
 
-#############################################################################
-#GRAFICO EXPERIMENTAL
-# Combine the datasets with pre-defined NDVI categories
-donoso_2023_sf$Year <- "2023"
-donoso_2024_sf$Year <- "2024"
-combined_data <- rbind(donoso_2023_sf, donoso_2024_sf)
-
-# Filter for specific ID_Poly_po and valid data
-filtered_data <- combined_data %>%
-  filter(ID_Poly_po == 9, !is.na(NDVI_Category))
-
-# Prepare the plot data by summarizing the count of each category
-plot_data <- filtered_data %>%
-  group_by(NDVI_Category, Year) %>%
-  summarise(Count = n(), .groups = 'drop')
-
-# Create the plot
-p <- ggplot(plot_data, aes(x = NDVI_Category, y = Count, fill = Year)) +
-  geom_bar(stat = "identity", position = position_dodge(0.8), color = "black") +
-  geom_vline(xintercept = 5.5, linetype = "dashed", color = "red", size = 1) +
-  annotate("text", x = 5.5, y = max(plot_data$Count), label = "Límite estimado de la actividad fotosintética", 
-           angle = 90, vjust = -0.5, hjust = 1, color = "red") +
-  scale_y_continuous(labels = function(x) format(x, big.mark = ".", decimal.mark = ",")) +
-  labs(title = "Categorías de NDVI para la unidad n° 9",
-       x = "Categoría de NDVI",
-       y = "Recuento de píxeles",
-      fill="Año")+
-  theme_minimal()
-
-print(p)
-
-
 ###########################################################################
-#GRAFICO EXPERIMENTAL
+#GRAFICOS DE FRECUENCIAS PARA LOS 13 POLYS
 
 # Combine the datasets with pre-defined NDVI categories
 donoso_2023_sf$Year <- "2023"
@@ -199,9 +169,206 @@ for (plot in plot_list) {
   print(plot)
 }
 
+#########################################################################################################
+#TRABAJO CON AGRUPACIONES PROPUESTAS ME SUBTIPOS DE VEGETACION
+
+# Definir los grupos
+groups <- list(
+  group1 = c(5, 7),
+  group2 = c(6, 8, 9, 10, 11, 12, 13),
+  group3 = c(1, 2, 3, 4)
+)
+
+
+# Asignar los grupos según ID_Poly_po
+donoso_2023_sf <- donoso_2023_sf %>%
+  mutate(Group = case_when(
+    ID_Poly_po %in% groups$group1 ~ "group1",
+    ID_Poly_po %in% groups$group2 ~ "group2",
+    ID_Poly_po %in% groups$group3 ~ "group3",
+    TRUE ~ "other"  # Para cualquier ID que no esté listado en los grupos
+  ))
+
+donoso_2024_sf <- donoso_2024_sf %>%
+  mutate(Group = case_when(
+    ID_Poly_po %in% groups$group1 ~ "group1",
+    ID_Poly_po %in% groups$group2 ~ "group2",
+    ID_Poly_po %in% groups$group3 ~ "group3",
+    TRUE ~ "other"  # Para cualquier ID que no esté listado en los grupos
+  ))
+
+# Opcional: Mostrar una tabla con las primeras filas de los datos con los grupos asignados
+head(donoso_2023_sf[c("ID_Poly_po", "NDVI_Category", "Group")])
+head(donoso_2024_sf[c("ID_Poly_po", "NDVI_Category", "Group")])
+
+# Iniciar un data frame para almacenar todos los resultados combinados
+all_combined_frequencies <- data.frame()
+
+# Iterar sobre cada grupo definido
+for (group in c("group1", "group2", "group3")) {
+  # Filtrar para cada grupo para ambos años
+  group_data_2023 <- donoso_2023_sf %>%
+    filter(Group == group) %>%
+    st_drop_geometry()  # Eliminar geometría para operaciones no espaciales
+  
+  group_data_2024 <- donoso_2024_sf %>%
+    filter(Group == group) %>%
+    st_drop_geometry()  # Eliminar geometría para operaciones no espaciales
+  
+  # Calcular los percentiles para cada grupo
+  percentiles_2023 <- quantile(group_data_2023$Mean_ndvi_, probs = c(0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1), na.rm = TRUE)
+  print(paste("Percentiles 2023 for Group", group, ":", percentiles_2023))
+  
+  # Calcular las frecuencias para 2023
+  frequencies_2023 <- group_data_2023 %>%
+    group_by(NDVI_Category) %>%
+    summarise(Frequency_2023 = n(), .groups = 'drop')
+  
+  # Calcular las frecuencias para 2024
+  frequencies_2024 <- group_data_2024 %>%
+    group_by(NDVI_Category) %>%
+    summarise(Frequency_2024 = n(), .groups = 'drop')
+  
+  # Combinar las tablas de frecuencias de 2023 y 2024
+  combined_frequencies <- full_join(frequencies_2023, frequencies_2024, by = "NDVI_Category")
+  combined_frequencies$Group <- group  # Añadir el grupo para referencia
+  
+  # Acumular los resultados en el data frame general
+  all_combined_frequencies <- rbind(all_combined_frequencies, combined_frequencies)
+}
+
+# Ordenar el resultado final por `Group` y `NDVI_Category`
+final_table <- all_combined_frequencies %>%
+  arrange(Group, NDVI_Category)
+
+# Imprimir el resultado final
+print(final_table)
+
+# Especificar la ruta y el nombre del archivo
+output_path <- "E:/ANGLO_Ortiga CDE/BD/Group_frequenciesNDVI_MT_20240513_v1.csv"
+
+# Exportar final_table a un archivo CSV
+write.csv(final_table, output_path, row.names = FALSE)
+
+##############################################################################################################
+#GRAFICOS DE AGRUPACIONES PROPUESTAS ME SUBTIPOS DE VEGETACION
+
+#Subtipo Carex macloviana
+
+# Añadir la columna 'Year' a cada dataframe
+donoso_2023_sf$Year <- "2023"
+donoso_2024_sf$Year <- "2024"
+
+# Filtrar por grupo antes de combinar
+donoso_2023_sf_group1 <- donoso_2023_sf %>% filter(Group == "group1")
+donoso_2024_sf_group1 <- donoso_2024_sf %>% filter(Group == "group1")
+
+# Combinar los dataframes filtrados
+combined_data <- rbind(donoso_2023_sf_group1, donoso_2024_sf_group1)
+
+# Filtrar datos para el grupo 1 y asegurar que las categorías de NDVI son válidas
+filtered_data <- combined_data %>%
+  filter(Group == "group1", !is.na(NDVI_Category))
+
+# Preparar los datos para el gráfico sumarizando el conteo de cada categoría
+plot_data <- filtered_data %>%
+  group_by(NDVI_Category, Year) %>%
+  summarise(Count = n(), .groups = 'drop')
+
+# Crear el gráfico
+p <- ggplot(plot_data, aes(x = NDVI_Category, y = Count, fill = Year)) +
+  geom_bar(stat = "identity", position = position_dodge(0.8), color = "black") +
+  geom_vline(xintercept = 5.5, linetype = "dashed", color = "red", size = 1) +
+  annotate("text", x = 5.5, y = max(plot_data$Count, na.rm = TRUE), label = "Límite estimado de la actividad fotosintética", 
+           angle = 90, vjust = -0.5, hjust = 1, color = "red") +
+  scale_y_continuous(labels = function(x) format(x, big.mark = ".", decimal.mark = ",")) +
+  labs(title = "Subtipo Vega de Carex macloviana",
+       x = "Categoría de NDVI",
+       y = "Recuento de píxeles",
+       fill="Año") +
+  theme_minimal()
+
+# Mostrar el gráfico
+print(p)
+
+#Subtipo Vega de Patosia clandestina y Carex macloviana
+
+# Añadir la columna 'Year' a cada dataframe
+donoso_2023_sf$Year <- "2023"
+donoso_2024_sf$Year <- "2024"
+
+# Filtrar por grupo antes de combinar
+donoso_2023_sf_group2 <- donoso_2023_sf %>% filter(Group == "group2")
+donoso_2024_sf_group2 <- donoso_2024_sf %>% filter(Group == "group2")
+
+# Combinar los dataframes filtrados
+combined_data <- rbind(donoso_2023_sf_group2, donoso_2024_sf_group2)
+
+# Filtrar datos para el grupo 1 y asegurar que las categorías de NDVI son válidas
+filtered_data <- combined_data %>%
+  filter(Group == "group2", !is.na(NDVI_Category))
+
+# Preparar los datos para el gráfico sumarizando el conteo de cada categoría
+plot_data <- filtered_data %>%
+  group_by(NDVI_Category, Year) %>%
+  summarise(Count = n(), .groups = 'drop')
+
+# Crear el gráfico
+p <- ggplot(plot_data, aes(x = NDVI_Category, y = Count, fill = Year)) +
+  geom_bar(stat = "identity", position = position_dodge(0.8), color = "black") +
+  geom_vline(xintercept = 5.5, linetype = "dashed", color = "red", size = 1) +
+  annotate("text", x = 5.5, y = max(plot_data$Count, na.rm = TRUE), label = "Límite estimado de la actividad fotosintética", 
+           angle = 90, vjust = -0.5, hjust = 1, color = "red") +
+  scale_y_continuous(labels = function(x) format(x, big.mark = ".", decimal.mark = ",")) +
+  labs(title = "Subtipo Vega de Patosia clandestina y Carex macloviana",
+       x = "Categoría de NDVI",
+       y = "Recuento de píxeles",
+       fill="Año") +
+  theme_minimal()
+
+# Mostrar el gráfico
+print(p)
+
+#Subtipo Vega de Patosia clandestina y Zameioscirpus gaimardioides
+
+# Añadir la columna 'Year' a cada dataframe
+donoso_2023_sf$Year <- "2023"
+donoso_2024_sf$Year <- "2024"
+
+# Filtrar por grupo antes de combinar
+donoso_2023_sf_group3 <- donoso_2023_sf %>% filter(Group == "group3")
+donoso_2024_sf_group3 <- donoso_2024_sf %>% filter(Group == "group3")
+
+# Combinar los dataframes filtrados
+combined_data <- rbind(donoso_2023_sf_group3, donoso_2024_sf_group3)
+
+# Filtrar datos para el grupo 1 y asegurar que las categorías de NDVI son válidas
+filtered_data <- combined_data %>%
+  filter(Group == "group3", !is.na(NDVI_Category))
+
+# Preparar los datos para el gráfico sumarizando el conteo de cada categoría
+plot_data <- filtered_data %>%
+  group_by(NDVI_Category, Year) %>%
+  summarise(Count = n(), .groups = 'drop')
+
+# Crear el gráfico
+p <- ggplot(plot_data, aes(x = NDVI_Category, y = Count, fill = Year)) +
+  geom_bar(stat = "identity", position = position_dodge(0.8), color = "black") +
+  geom_vline(xintercept = 5.5, linetype = "dashed", color = "red", size = 1) +
+  annotate("text", x = 5.5, y = max(plot_data$Count, na.rm = TRUE), label = "Límite estimado de la actividad fotosintética", 
+           angle = 90, vjust = -0.5, hjust = 1, color = "red") +
+  scale_y_continuous(labels = function(x) format(x, big.mark = ".", decimal.mark = ",")) +
+  labs(title = "Vega de Patosia clandestina y Zameioscirpus gaimardioides",
+       x = "Categoría de NDVI",
+       y = "Recuento de píxeles",
+       fill="Año") +
+  theme_minimal()
+
+# Mostrar el gráfico
+print(p)
 
 ######################################################################
-#APLICACION DE WEISSERSTEIN DISTANCE PARA CADA POLY
+#APLICACION DE WEISSERSTEIN DISTANCE PARA LOS 13 POLYS
 # Obtener los ID únicos de los polígonos
 unique_ids <- unique(c(donoso_2023_sf$ID_Poly_po, donoso_2024_sf$ID_Poly_po))
 
@@ -244,6 +411,9 @@ for (id in unique_ids) {
   }
 }
 
+
+#############################################################################################################################
+####CALULOS UNITARIOS
 #############################################################################
 #CALCULO DE CUANTILES PARA 1 SOLO POLY
 
@@ -359,87 +529,35 @@ decile_data <- data.frame(
 # Imprimir el dataframe
 print(decile_data)
 
-#########################################################################################################
-#TRABAJO CON AGRUPACIONES PROPUESTAS ME
 
-# Definir los grupos
-groups <- list(
-  group1 = c(5, 7),
-  group2 = c(6, 8, 9, 10, 11, 12, 13),
-  group3 = c(1, 2, 3, 4)
-)
+#############################################################################
+#GRAFICO DE FRECUENCIAS PARA 1 SOLO POLY
 
-# Calcular los cuantiles para cada grupo
-calculate_percentiles <- function(data, group) {
-  filtered_data <- subset(data, ID_Poly_po %in% group)
-  quantile(filtered_data$Mean_ndvi_, probs = c(0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1), na.rm = TRUE)
-}
-
-percentiles_2023 <- lapply(groups, calculate_percentiles, data = donoso_2023_sf)
-percentiles_2024 <- lapply(groups, calculate_percentiles, data = donoso_2024_sf)
-
-# Crear categorías de NDVI basadas en los cuantiles
-create_labels <- function(data, percentiles) {
-  breaks <- c(-Inf, percentiles, Inf)
-  cut(data$Mean_ndvi_, breaks = breaks, labels = c(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11))
-}
-
-# Aplicar la función para cada grupo y año
-apply_labels <- function(data, groups, percentiles) {
-  labeled_data <- data
-  for (group_name in names(groups)) {
-    group <- groups[[group_name]]
-    group_percentiles <- percentiles[[group_name]]
-    group_data <- subset(labeled_data, ID_Poly_po %in% group)
-    labeled_data$NDVI_Category[labeled_data$ID_Poly_po %in% group] <- create_labels(group_data, group_percentiles)
-  }
-  labeled_data
-}
-
-donoso_2023_sf <- apply_labels(donoso_2023_sf, groups, percentiles_2023)
-donoso_2024_sf <- apply_labels(donoso_2024_sf, groups, percentiles_2024)
-
-# Combinar los datos de 2023 y 2024
+# Combine the datasets with pre-defined NDVI categories
 donoso_2023_sf$Year <- "2023"
 donoso_2024_sf$Year <- "2024"
 combined_data <- rbind(donoso_2023_sf, donoso_2024_sf)
 
-# Calcular las frecuencias de las categorías por grupo y año
-calculate_frequencies <- function(data, group_name) {
-  data %>%
-    group_by(NDVI_Category, Year) %>%
-    summarise(Count = n(), .groups = 'drop') %>%
-    mutate(Group = group_name)
-}
+# Filter for specific ID_Poly_po and valid data
+filtered_data <- combined_data %>%
+  filter(ID_Poly_po == 9, !is.na(NDVI_Category))
 
-# Aplicar la función de cálculo de frecuencias a los datos combinados
-frequencies <- do.call(rbind, lapply(names(groups), function(group_name) {
-  group_data <- subset(combined_data, ID_Poly_po %in% groups[[group_name]])
-  calculate_frequencies(group_data, group_name)
-}))
+# Prepare the plot data by summarizing the count of each category
+plot_data <- filtered_data %>%
+  group_by(NDVI_Category, Year) %>%
+  summarise(Count = n(), .groups = 'drop')
 
-# Graficar los resultados
-plot_frequencies <- function(data, group_name) {
-  ggplot(data, aes(x = NDVI_Category, y = Count, fill = Year)) +
-    geom_bar(stat = "identity", position = position_dodge(0.8), color = "black") +
-    geom_vline(xintercept = 5.5, linetype = "dashed", color = "red", size = 1) +
-    annotate("text", x = 5.5, y = max(data$Count), label = "Límite estimado de la actividad fotosintética", 
-             angle = 90, vjust = -0.5, hjust = 1, color = "red") +
-    scale_y_continuous(labels = function(x) format(x, big.mark = ".", decimal.mark = ",")) +
-    labs(title = paste("Categorías de NDVI para el grupo", group_name),
-         x = "Categoría de NDVI",
-         y = "Recuento de píxeles",
-         fill = "Año") +
-    theme_minimal()
-}
+# Create the plot
+p <- ggplot(plot_data, aes(x = NDVI_Category, y = Count, fill = Year)) +
+  geom_bar(stat = "identity", position = position_dodge(0.8), color = "black") +
+  geom_vline(xintercept = 5.5, linetype = "dashed", color = "red", size = 1) +
+  annotate("text", x = 5.5, y = max(plot_data$Count), label = "Límite estimado de la actividad fotosintética", 
+           angle = 90, vjust = -0.5, hjust = 1, color = "red") +
+  scale_y_continuous(labels = function(x) format(x, big.mark = ".", decimal.mark = ",")) +
+  labs(title = "Categorías de NDVI para la unidad n° 9",
+       x = "Categoría de NDVI",
+       y = "Recuento de píxeles",
+       fill="Año")+
+  theme_minimal()
 
-# Crear y mostrar los gráficos para cada grupo
-plots <- lapply(names(groups), function(group_name) {
-  group_data <- subset(frequencies, Group == group_name)
-  plot_frequencies(group_data, group_name)
-})
-
-# Mostrar los gráficos
-for (p in plots) {
-  print(p)
-}
+print(p)
