@@ -7,14 +7,18 @@ library(dplyr)
 library(transport)
 
 # Lee NDVI Donoso 2023
-donoso_2023 <- "D:/ANGLO_Ortiga CDE/CAPAS/20240507_2023.shp"
+donoso_2023 <- "E:/ANGLO_Ortiga CDE/CAPAS/20240507_2023.shp"
 donoso_2023_sf <- st_read(donoso_2023)
 unique_ids_2023 <- unique(donoso_2023_sf$ID_Poly_po)
 
 # Lee NDVI Donoso 2024
-donoso_2024 <- "D:/ANGLO_Ortiga CDE/CAPAS/20240507_2024.shp"
+donoso_2024 <- "E:/ANGLO_Ortiga CDE/CAPAS/20240507_2024.shp"
 donoso_2024_sf <- st_read(donoso_2024)
 unique_ids_2024 <- unique(donoso_2024_sf$ID_Poly_po)
+
+# Definir el área de cada píxel en m2
+area_per_pixel_2023 <- 0.000261986596
+area_per_pixel_2024 <- 0.000277569761180625
 
 #Genera histogramas 2023
 for (id in unique_ids_2023) {
@@ -23,10 +27,10 @@ for (id in unique_ids_2023) {
   
   if (nrow(subset_data) > 0) {
     p <- ggplot(subset_data, aes(x = Mean_ndvi_)) +
-      geom_histogram(bins = 10, fill = "blue", color = "black") +
+      geom_histogram(aes(y = ..count.. * area_per_pixel_2023), bins = 10, fill = "blue", color = "black") +
       ggtitle(paste("Histogram of Mean_ndvi_ for ID_Poly_po:", id)) +
       xlab("Mean_ndvi_") +
-      ylab("Frequency") +
+      ylab("Area (m2)") +
       xlim(-1, 1)
     print(p)
   } else {
@@ -41,10 +45,10 @@ for (id in unique_ids_2024) {
   
   if (nrow(subset_data) > 0) {
     p <- ggplot(subset_data, aes(x = Mean_ndvi_)) +
-      geom_histogram(bins = 10, fill = "blue", color = "black") +
+      geom_histogram(aes(y = ..count.. * area_per_pixel_2024), bins = 10, fill = "blue", color = "black") +
       ggtitle(paste("Histogram of Mean_ndvi_ for ID_Poly_po:", id, " (2024)")) +
       xlab("Mean_ndvi_") +
-      ylab("Frequency") +
+      ylab("Area (m2)") +
       xlim(-1, 1)
     print(p)
   } else {
@@ -120,7 +124,7 @@ final_table <- all_combined_frequencies #%>%
 print(final_table)
 
 # Especificar la ruta y el nombre del archivo
-output_path <- "D:/ANGLO_Ortiga CDE/BD/ID_Poly_frequenciesNDVI_MT_20240513_v1.csv"
+output_path <- "E:/ANGLO_Ortiga CDE/BD/ID_Poly_frequenciesNDVI_MT_20240513_v1.csv"
 
 # Exportar final_table a un archivo CSV
 write.csv(final_table, output_path, row.names = FALSE)
@@ -128,43 +132,36 @@ write.csv(final_table, output_path, row.names = FALSE)
 ###########################################################################
 #GRAFICOS DE FRECUENCIAS PARA LOS 13 POLYS
 
-# Combine the datasets with pre-defined NDVI categories
-donoso_2023_sf$Year <- "2023"
-donoso_2024_sf$Year <- "2024"
-combined_data <- rbind(donoso_2023_sf, donoso_2024_sf)
+# Crear gráficos de frecuencias para los 13 polígonos usando áreas en m2
+combined_data <- rbind(donoso_2023_sf %>% mutate(Year = "2023"), donoso_2024_sf %>% mutate(Year = "2024"))
 
-# Create a list to store plots
+# Crear una lista para almacenar gráficos
 plot_list <- list()
 
-# Loop over each ID_Poly_po from 1 to 13
 for (id in 1:13) {
-  # Filter for specific ID_Poly_po and valid data
   filtered_data <- combined_data %>%
     filter(ID_Poly_po == id, !is.na(NDVI_Category))
   
-  # Prepare the plot data by summarizing the count of each category
   plot_data <- filtered_data %>%
     group_by(NDVI_Category, Year) %>%
-    summarise(Count = n(), .groups = 'drop')
+    summarise(Count = n(), .groups = 'drop') %>%
+    mutate(Area = ifelse(Year == "2023", Count * area_per_pixel_2023, Count * area_per_pixel_2024))
   
-  # Create the plot
-  p <- ggplot(plot_data, aes(x = NDVI_Category, y = Count, fill = Year)) +
+  p <- ggplot(plot_data, aes(x = NDVI_Category, y = Area, fill = Year)) +
     geom_bar(stat = "identity", position = position_dodge(0.8), color = "black") +
     geom_vline(xintercept = 5.5, linetype = "dashed", color = "red", size = 1) +
-    annotate("text", x = 5.5, y = max(plot_data$Count), label = "Límite estimado de la actividad fotosintética", 
+    annotate("text", x = 5.5, y = max(plot_data$Area), label = "Límite estimado de la actividad fotosintética", 
              angle = 90, vjust = -0.5, hjust = 1, color = "red") +
     scale_y_continuous(labels = function(x) format(x, big.mark = ".", decimal.mark = ",")) +
     labs(title = paste("Categorías de NDVI para la Unidad n°", id),
          x = "Categoría de NDVI",
-         y = "Recuento de píxeles",
-         fill="Año") +
+         y = "Área (m2)",
+         fill = "Año") +
     theme_minimal()
   
-  # Store the plot in the list
   plot_list[[id]] <- p
 }
 
-# Optionally, print plots individually or use them as needed
 for (plot in plot_list) {
   print(plot)
 }
@@ -245,122 +242,93 @@ final_table <- all_combined_frequencies %>%
 print(final_table)
 
 # Especificar la ruta y el nombre del archivo
-output_path <- "D:/ANGLO_Ortiga CDE/BD/Group_frequenciesNDVI_MT_20240513_v1.csv"
+output_path <- "E:/ANGLO_Ortiga CDE/BD/Group_frequenciesNDVI_MT_20240513_v1.csv"
 
 ##############################################################################################################
 #GRAFICOS DE AGRUPACIONES PROPUESTAS ME SUBTIPOS DE VEGETACION
- 
-#Subtipo Carex macloviana
- 
-# Añadir la columna 'Year' a cada dataframe
-donoso_2023_sf$Year <- "2023"
-donoso_2024_sf$Year <- "2024"
- 
-# Filtrar por grupo antes de combinar
-donoso_2023_sf_group1 <- donoso_2023_sf %>% filter(Group == "group1")
-donoso_2024_sf_group1 <- donoso_2024_sf %>% filter(Group == "group1")
- 
-# Combinar los dataframes filtrados
-combined_data <- rbind(donoso_2023_sf_group1, donoso_2024_sf_group1)
 
-# Filtrar datos para el grupo 1 y asegurar que las categorías de NDVI son válidas
-filtered_data <- combined_data %>%
-filter(Group == "group1", !is.na(NDVI_Category))
- 
-# Preparar los datos para el gráfico sumarizando el conteo de cada categoría
-plot_data <- filtered_data %>%
- group_by(NDVI_Category, Year) %>%
- summarise(Count = n(), .groups = 'drop')
- 
-# Crear el gráfico
-p <- ggplot(plot_data, aes(x = NDVI_Category, y = Count, fill = Year)) +
- geom_bar(stat = "identity", position = position_dodge(0.8), color = "black") +
- geom_vline(xintercept = 5.5, linetype = "dashed", color = "red", size = 1) +
- annotate("text", x = 5.5, y = max(plot_data$Count, na.rm = TRUE), label = "Límite estimado de la actividad fotosintética", 
-            angle = 90, vjust = -0.5, hjust = 1, color = "red") +
- scale_y_continuous(labels = function(x) format(x, big.mark = ".", decimal.mark = ",")) +
- labs(title = "Subtipo Vega de Carex macloviana",
-      x = "Categoría de NDVI",
-      y = "Recuento de píxeles",
-      fill="Año") +
-theme_minimal()
- 
-# Mostrar el gráfico
-print(p)
- 
-#Subtipo Vega de Patosia clandestina y Carex macloviana
- 
-# Añadir la columna 'Year' a cada dataframe
-donoso_2023_sf$Year <- "2023"
-donoso_2024_sf$Year <- "2024"
- 
-# Filtrar por grupo antes de combinar
-donoso_2023_sf_group2 <- donoso_2023_sf %>% filter(Group == "group2")
-donoso_2024_sf_group2 <- donoso_2024_sf %>% filter(Group == "group2")
- 
-# Combinar los dataframes filtrados
-combined_data <- rbind(donoso_2023_sf_group2, donoso_2024_sf_group2)
- 
-# Filtrar datos para el grupo 1 y asegurar que las categorías de NDVI son válidas
-filtered_data <- combined_data %>%
-  filter(Group == "group2", !is.na(NDVI_Category))
- 
-# Preparar los datos para el gráfico sumarizando el conteo de cada categoría
+#Subtipo Carex macloviana
+combined_data_group1 <- rbind(
+  donoso_2023_sf %>% filter(Group == "group1") %>% mutate(Year = "2023"),
+  donoso_2024_sf %>% filter(Group == "group1") %>% mutate(Year = "2024")
+)
+
+filtered_data <- combined_data_group1 %>%
+  filter(!is.na(NDVI_Category))
+
 plot_data <- filtered_data %>%
   group_by(NDVI_Category, Year) %>%
-  summarise(Count = n(), .groups = 'drop')
- 
-# Crear el gráfico
-p <- ggplot(plot_data, aes(x = NDVI_Category, y = Count, fill = Year)) +
+  summarise(Count = n(), .groups = 'drop') %>%
+  mutate(Area = ifelse(Year == "2023", Count * area_per_pixel_2023, Count * area_per_pixel_2024))
+
+p <- ggplot(plot_data, aes(x = NDVI_Category, y = Area, fill = Year)) +
   geom_bar(stat = "identity", position = position_dodge(0.8), color = "black") +
   geom_vline(xintercept = 5.5, linetype = "dashed", color = "red", size = 1) +
-  annotate("text", x = 5.5, y = max(plot_data$Count, na.rm = TRUE), label = "Límite estimado de la actividad fotosintética", 
-               angle = 90, vjust = -0.5, hjust = 1, color = "red") +
+  annotate("text", x = 5.5, y = max(plot_data$Area, na.rm = TRUE), label = "Límite estimado de la actividad fotosintética", 
+           angle = 90, vjust = -0.5, hjust = 1, color = "red") +
   scale_y_continuous(labels = function(x) format(x, big.mark = ".", decimal.mark = ",")) +
-  labs(title = "Subtipo Vega de Patosia clandestina y Carex macloviana",
-           x = "Categoría de NDVI",
-           y = "Recuento de píxeles",
-           fill="Año") +
-theme_minimal()
+  labs(title = "Subtipo Vega de Carex macloviana",
+       x = "Categoría de NDVI",
+       y = "Área (m2)",
+       fill = "Año") +
+  theme_minimal()
 
-# Mostrar el gráfico
 print(p)
 
-#Subtipo Vega de Patosia clandestina y Zameioscirpus gaimardioides
-# Añadir la columna 'Year' a cada dataframe
-donoso_2023_sf$Year <- "2023"
-donoso_2024_sf$Year <- "2024"
- 
-# Filtrar por grupo antes de combinar
-donoso_2023_sf_group3 <- donoso_2023_sf %>% filter(Group == "group3")
-donoso_2024_sf_group3 <- donoso_2024_sf %>% filter(Group == "group3")
- 
-# Combinar los dataframes filtrados
-combined_data <- rbind(donoso_2023_sf_group3, donoso_2024_sf_group3)
- 
-# Filtrar datos para el grupo 1 y asegurar que las categorías de NDVI son válidas
-filtered_data <- combined_data %>%
-  filter(Group == "group3", !is.na(NDVI_Category))
+# Subtipo Vega de Patosia clandestina y Carex macloviana
+combined_data_group2 <- rbind(
+  donoso_2023_sf %>% filter(Group == "group2") %>% mutate(Year = "2023"),
+  donoso_2024_sf %>% filter(Group == "group2") %>% mutate(Year = "2024")
+)
 
-# Preparar los datos para el gráfico sumarizando el conteo de cada categoría
+filtered_data <- combined_data_group2 %>%
+  filter(!is.na(NDVI_Category))
+
 plot_data <- filtered_data %>%
- group_by(NDVI_Category, Year) %>%
- summarise(Count = n(), .groups = 'drop')
- 
-# Crear el gráfico
-p <- ggplot(plot_data, aes(x = NDVI_Category, y = Count, fill = Year)) +
- geom_bar(stat = "identity", position = position_dodge(0.8), color = "black") +
- geom_vline(xintercept = 5.5, linetype = "dashed", color = "red", size = 1) +
- annotate("text", x = 5.5, y = max(plot_data$Count, na.rm = TRUE), label = "Límite estimado de la actividad fotosintética", 
-               angle = 90, vjust = -0.5, hjust = 1, color = "red") +
-scale_y_continuous(labels = function(x) format(x, big.mark = ".", decimal.mark = ",")) +
-labs(title = "Vega de Patosia clandestina y Zameioscirpus gaimardioides",
-           x = "Categoría de NDVI",
-           y = "Recuento de píxeles",
-           fill="Año") +
-theme_minimal()
+  group_by(NDVI_Category, Year) %>%
+  summarise(Count = n(), .groups = 'drop') %>%
+  mutate(Area = ifelse(Year == "2023", Count * area_per_pixel_2023, Count * area_per_pixel_2024))
 
-# Mostrar el gráfico
+p <- ggplot(plot_data, aes(x = NDVI_Category, y = Area, fill = Year)) +
+  geom_bar(stat = "identity", position = position_dodge(0.8), color = "black") +
+  geom_vline(xintercept = 5.5, linetype = "dashed", color = "red", size = 1) +
+  annotate("text", x = 5.5, y = max(plot_data$Area, na.rm = TRUE), label = "Límite estimado de la actividad fotosintética", 
+           angle = 90, vjust = -0.5, hjust = 1, color = "red") +
+  scale_y_continuous(labels = function(x) format(x, big.mark = ".", decimal.mark = ",")) +
+  labs(title = "Subtipo Vega de Patosia clandestina y Carex macloviana",
+       x = "Categoría de NDVI",
+       y = "Área (m2)",
+       fill = "Año") +
+  theme_minimal()
+
+print(p)
+
+# Subtipo Vega de Patosia clandestina y Zameioscirpus gaimardioides
+combined_data_group3 <- rbind(
+  donoso_2023_sf %>% filter(Group == "group3") %>% mutate(Year = "2023"),
+  donoso_2024_sf %>% filter(Group == "group3") %>% mutate(Year = "2024")
+)
+
+filtered_data <- combined_data_group3 %>%
+  filter(!is.na(NDVI_Category))
+
+plot_data <- filtered_data %>%
+  group_by(NDVI_Category, Year) %>%
+  summarise(Count = n(), .groups = 'drop') %>%
+  mutate(Area = ifelse(Year == "2023", Count * area_per_pixel_2023, Count * area_per_pixel_2024))
+
+p <- ggplot(plot_data, aes(x = NDVI_Category, y = Area, fill = Year)) +
+  geom_bar(stat = "identity", position = position_dodge(0.8), color = "black") +
+  geom_vline(xintercept = 5.5, linetype = "dashed", color = "red", size = 1) +
+  annotate("text", x = 5.5, y = max(plot_data$Area, na.rm = TRUE), label = "Límite estimado de la actividad fotosintética", 
+           angle = 90, vjust = -0.5, hjust = 1, color = "red") +
+  scale_y_continuous(labels = function(x) format(x, big.mark = ".", decimal.mark = ",")) +
+  labs(title = "Subtipo Vega de Patosia clandestina y Zameioscirpus gaimardioides",
+       x = "Categoría de NDVI",
+       y = "Área (m2)",
+       fill = "Año") +
+  theme_minimal()
+
 print(p)
 
 ######################################################################
@@ -620,22 +588,21 @@ combined_data <- rbind(donoso_2023_sf, donoso_2024_sf)
 filtered_data <- combined_data %>%
   filter(ID_Poly_po == 9, !is.na(NDVI_Category))
 
-# Prepare the plot data by summarizing the count of each category
 plot_data <- filtered_data %>%
   group_by(NDVI_Category, Year) %>%
-  summarise(Count = n(), .groups = 'drop')
+  summarise(Count = n(), .groups = 'drop') %>%
+  mutate(Area = ifelse(Year == "2023", Count * area_per_pixel_2023, Count * area_per_pixel_2024))
 
-# Create the plot
-p <- ggplot(plot_data, aes(x = NDVI_Category, y = Count, fill = Year)) +
+p <- ggplot(plot_data, aes(x = NDVI_Category, y = Area, fill = Year)) +
   geom_bar(stat = "identity", position = position_dodge(0.8), color = "black") +
   geom_vline(xintercept = 5.5, linetype = "dashed", color = "red", size = 1) +
-  annotate("text", x = 5.5, y = max(plot_data$Count), label = "Límite estimado de la actividad fotosintética", 
+  annotate("text", x = 5.5, y = max(plot_data$Area), label = "Límite estimado de la actividad fotosintética", 
            angle = 90, vjust = -0.5, hjust = 1, color = "red") +
   scale_y_continuous(labels = function(x) format(x, big.mark = ".", decimal.mark = ",")) +
   labs(title = "Categorías de NDVI para la unidad n° 9",
        x = "Categoría de NDVI",
-       y = "Recuento de píxeles",
-       fill="Año")+
+       y = "Área (m2)",
+       fill="Año") +
   theme_minimal()
 
 print(p)
