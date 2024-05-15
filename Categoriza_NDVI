@@ -240,7 +240,7 @@ for (group in c("group1", "group2", "group3")) {
 # Ordenar el resultado final por `Group` y `NDVI_Category`
 final_table <- all_combined_frequencies %>%
   arrange(Group, NDVI_Category)
-  
+
 # Imprimir el resultado final
 print(final_table)
 
@@ -364,58 +364,131 @@ theme_minimal()
 print(p)
 
 ######################################################################
-#APLICACION DE WEISSERSTEIN DISTANCE PARA LOS 13 POLYS
+#APLICACION DE WAISSERSTEIN DISTANCE PARA LOS 13 POLYS
 # Obtener los ID únicos de los polígonos
 unique_ids <- unique(c(donoso_2023_sf$ID_Poly_po, donoso_2024_sf$ID_Poly_po))
 
 # Iterar sobre cada ID_Poly_po
-  for (id in unique_ids) {
-   # Filtrar los datos por ID_Poly_po
-   subset_data_2023 <- donoso_2023_sf[donoso_2023_sf$ID_Poly_po == id, ]
-   subset_data_2024 <- donoso_2024_sf[donoso_2024_sf$ID_Poly_po == id, ]
-   
-   # Asegurarse que los datos estén en el rango -1 a 1
-   subset_data_2023 <- subset_data_2023[subset_data_2023$Mean_ndvi_ >= -1 & subset_data_2023$Mean_ndvi_ <= 1, ]
-   subset_data_2024 <- subset_data_2024[subset_data_2024$Mean_ndvi_ >= -1 & subset_data_2024$Mean_ndvi_ <= 1, ]
-   
-   # Histogramas con un número fijo de bins y un rango específico
-   breaks <- seq(-1, 1, length.out = 11)  # Asegura 10 bins iguales
-   hist_2023 <- hist(subset_data_2023$Mean_ndvi_, plot = FALSE, breaks = breaks, right = FALSE)
-   hist_2024 <- hist(subset_data_2024$Mean_ndvi_, plot = FALSE, breaks = breaks, right = FALSE)
+for (id in unique_ids) {
+  # Filtrar los datos por ID_Poly_po
+  subset_data_2023 <- donoso_2023_sf[donoso_2023_sf$ID_Poly_po == id, ]
+  subset_data_2024 <- donoso_2024_sf[donoso_2024_sf$ID_Poly_po == id, ]
   
-# Normalizar los histogramas
-total_mass_2023 <- sum(hist_2023$counts)
-total_mass_2024 <- sum(hist_2024$counts)
-normalized_hist_2023 <- hist_2023$counts / total_mass_2023
-normalized_hist_2024 <- hist_2024$counts / total_mass_2024
-   
-# Crear una matriz de costos asumiendo que los histogramas están igualmente espaciados
-   bin_count <- length(hist_2023$breaks) - 1
-   cost_matrix <- matrix(0, nrow = bin_count, ncol = bin_count)
-   for (i in 1:bin_count) {
-     for (j in 1:bin_count) {
-       cost_matrix[i, j] <- abs(i - j)  # Simple cost: distance between indices
-     }
-   }
- 
-# Calcular la distancia de Wasserstein
-   if (length(normalized_hist_2023) > 0 && length(normalized_hist_2024) > 0 && total_mass_2023 > 0 && total_mass_2024 > 0) {
-     wasserstein_distance <- wasserstein(normalized_hist_2023, normalized_hist_2024, costm = cost_matrix)
-     print(paste("Wasserstein distance for ID_Poly_po", id, ":", wasserstein_distance))
-   } else {
-     print(paste("Insufficient data for Wasserstein distance calculation for ID_Poly_po", id))
-   }
+  # Asegurarse que los datos estén en el rango -1 a 1
+  subset_data_2023 <- subset_data_2023[subset_data_2023$Mean_ndvi_ >= -1 & subset_data_2023$Mean_ndvi_ <= 1, ]
+  subset_data_2024 <- subset_data_2024[subset_data_2024$Mean_ndvi_ >= -1 & subset_data_2024$Mean_ndvi_ <= 1, ]
+  
+  # Histogramas con un número fijo de bins y un rango específico
+  breaks <- seq(-1, 1, length.out = 11)  # Asegura 10 bins iguales
+  hist_2023 <- hist(subset_data_2023$Mean_ndvi_, plot = FALSE, breaks = breaks, right = FALSE)
+  hist_2024 <- hist(subset_data_2024$Mean_ndvi_, plot = FALSE, breaks = breaks, right = FALSE)
+  
+  # Normalizar los histogramas
+  total_mass_2023 <- sum(hist_2023$counts)
+  total_mass_2024 <- sum(hist_2024$counts)
+  normalized_hist_2023 <- hist_2023$counts / total_mass_2023
+  normalized_hist_2024 <- hist_2024$counts / total_mass_2024
+  
+  #print(paste("ID_Poly_po", id, ":"))
+  #print("Histogram 2023 Normalized:")
+  #print(normalized_hist_2023)
+  #print("Histogram 2024 Normalized:")
+  #print(normalized_hist_2024)
+  
+  
+  # Crear una matriz de costos asumiendo que los histogramas están igualmente espaciados
+  bin_count <- length(hist_2023$breaks) - 1
+  cost_matrix <- matrix(0, nrow = bin_count, ncol = bin_count)
+  for (i in 1:bin_count) {
+    for (j in 1:bin_count) {
+      cost_matrix[i, j] <- abs(i - j)  # Simple cost: distance between indices
+    }
+  }
+  
+  #print("Cost Matrix:")
+  #print(cost_matrix)
+  
+  # Calcular la distancia de Wasserstein
+  if (length(normalized_hist_2023) > 0 && length(normalized_hist_2024) > 0 && total_mass_2023 > 0 && total_mass_2024 > 0) {
+    wasserstein_distance <- wasserstein(normalized_hist_2023, normalized_hist_2024, costm = cost_matrix)
+    print(paste("Wasserstein distance for ID_Poly_po", id, ":", wasserstein_distance))
+  } else {
+    print(paste("Insufficient data for Wasserstein distance calculation for ID_Poly_po", id))
+  }
 }
 
-# Graficar los resultados
-ggplot(results, aes(x = factor(ID_Poly_po), y = Wasserstein_Distance)) +
-  geom_bar(stat = "identity", fill = "steelblue") +
-  theme_minimal() +
-  labs(title = "Distancia de Wasserstein por ID_Poly_po",
-       x = "ID_Poly_po",
-       y = "Distancia de Wasserstein") +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+###########################################################################################
+#WAISSERSTEIN PARA LOS GRUPOS 1, 2 Y 3
 
+# Iterar sobre cada grupo
+for (group_name in names(groups)) {
+  # Filtrar los datos por grupo
+  subset_data_2023 <- donoso_2023_sf %>% filter(ID_Poly_po %in% groups[[group_name]])
+  subset_data_2024 <- donoso_2024_sf %>% filter(ID_Poly_po %in% groups[[group_name]])
+  
+  # Asegurarse que los datos estén en el rango -1 a 1
+  subset_data_2023 <- subset_data_2023[subset_data_2023$Mean_ndvi_ >= -1 & subset_data_2023$Mean_ndvi_ <= 1, ]
+  subset_data_2024 <- subset_data_2024[subset_data_2024$Mean_ndvi_ >= -1 & subset_data_2024$Mean_ndvi_ <= 1, ]
+  
+  # Histogramas con un número fijo de bins y un rango específico
+  breaks <- seq(-1, 1, length.out = 11)  # Asegura 10 bins iguales
+  hist_2023 <- hist(subset_data_2023$Mean_ndvi_, plot = FALSE, breaks = breaks, right = FALSE)
+  hist_2024 <- hist(subset_data_2024$Mean_ndvi_, plot = FALSE, breaks = breaks, right = FALSE)
+  
+  # Normalizar los histogramas
+  total_mass_2023 <- sum(hist_2023$counts)
+  total_mass_2024 <- sum(hist_2024$counts)
+  normalized_hist_2023 <- hist_2023$counts / total_mass_2023
+  normalized_hist_2024 <- hist_2024$counts / total_mass_2024
+  
+  # Crear una matriz de costos asumiendo que los histogramas están igualmente espaciados
+  bin_count <- length(hist_2023$breaks) - 1
+  cost_matrix <- matrix(0, nrow = bin_count, ncol = bin_count)
+  for (i in 1:bin_count) {
+    for (j in 1:bin_count) {
+      cost_matrix[i, j] <- abs(i - j)  # Simple cost: distance between indices
+    }
+  }
+  
+  # Calcular la distancia de Wasserstein
+  if (length(normalized_hist_2023) > 0 && length(normalized_hist_2024) > 0 && total_mass_2023 > 0 && total_mass_2024 > 0) {
+    wasserstein_distance <- wasserstein(normalized_hist_2023, normalized_hist_2024, costm = cost_matrix)
+    print(paste("Wasserstein distance for group", group_name, ":", wasserstein_distance))
+  } else {
+    print(paste("Insufficient data for Wasserstein distance calculation for group", group_name))
+  }
+}
+
+###########################################################################################
+#COMPARA WAISSERSTEIN ENTRE DISTINTOS GRUPOS
+
+# Iniciar un data frame para almacenar los resultados de Wasserstein
+wasserstein_results <- data.frame(Group1 = character(), Group2 = character(), Wasserstein_Distance = numeric())
+
+# Iterar sobre cada par de grupos definidos
+group_names <- names(groups)
+for (i in 1:(length(group_names) - 1)) {
+  for (j in (i + 1):length(group_names)) {
+    group1 <- group_names[i]
+    group2 <- group_names[j]
+    
+    # Filtrar para cada grupo en el año 2024
+    group_data_2024_group1 <- donoso_2024_sf %>%
+      filter(Group == group1) %>%
+      st_drop_geometry()  # Eliminar geometría para operaciones no espaciales
+    
+    group_data_2024_group2 <- donoso_2024_sf %>%
+      filter(Group == group2) %>%
+      st_drop_geometry()  # Eliminar geometría para operaciones no espaciales
+    
+    # Calcular la distancia de Wasserstein entre los grupos para el año 2024
+    wasserstein_distance <- calculate_wasserstein(group_data_2024_group1$Mean_ndvi_, group_data_2024_group2$Mean_ndvi_)
+    wasserstein_results <- rbind(wasserstein_results, data.frame(Group1 = group1, Group2 = group2, Wasserstein_Distance = wasserstein_distance))
+  }
+}
+
+# Imprimir las distancias de Wasserstein
+print(wasserstein_results)
 
 #############################################################################################################################
 ####CALULOS UNITARIOS
