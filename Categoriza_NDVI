@@ -407,6 +407,15 @@ normalized_hist_2024 <- hist_2024$counts / total_mass_2024
    }
 }
 
+# Graficar los resultados
+ggplot(results, aes(x = factor(ID_Poly_po), y = Wasserstein_Distance)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  theme_minimal() +
+  labs(title = "Distancia de Wasserstein por ID_Poly_po",
+       x = "ID_Poly_po",
+       y = "Distancia de Wasserstein") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
 
 #############################################################################################################################
 ####CALULOS UNITARIOS
